@@ -1,12 +1,18 @@
-import type React from "react"
-import "@/app/globals.css"
+// app/layout.tsx
+import type { Metadata } from "next"
 import { Inter } from "next/font/google"
+import "@/app/globals.css"
 import Header from "@/components/header"
-import { WalletProvider } from "@/hooks/use-wallet"
-import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { Providers } from "./providers"
 
 const inter = Inter({ subsets: ["latin"] })
+
+export const metadata: Metadata = {
+  generator: 'v0.dev',
+  title: 'xBridge',
+  description: 'Your app description',
+}
 
 export default function RootLayout({
   children,
@@ -16,22 +22,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="dark">
-          <WalletProvider>
-            <Header />
-            <div className="pt-16">{children}</div>
-            <Toaster />
-          </WalletProvider>
-        </ThemeProvider>
+        <Providers>
+          <Header />
+          <div className="pt-16">{children}</div>
+          <Toaster />
+        </Providers>
       </body>
     </html>
   )
 }
-
-
-
-import './globals.css'
-
-export const metadata = {
-      generator: 'v0.dev'
-    };

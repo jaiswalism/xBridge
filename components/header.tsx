@@ -41,7 +41,7 @@ export default function Header() {
       <div className="max-w-7xl mx-auto flex justify-between items-center px-6">
         <div className="flex items-center">
           <Link href="/" className="text-2xl font-bold text-white flex items-center">
-            <Bridge className="w-6 h-6 mr-2 text-[#BE3144]" />
+            
             <span>xBridge</span>
           </Link>
         </div>

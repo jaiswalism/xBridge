@@ -150,13 +150,13 @@ export default function SwapInterface() {
           </div>
         </TabsContent>
 
-        <TabsContent value="bridge">
+        {/* <TabsContent value="bridge">
           <div className="h-40 flex items-center justify-center text-gray-500">Bridge functionality coming soon</div>
         </TabsContent>
 
         <TabsContent value="liquidity">
           <div className="h-40 flex items-center justify-center text-gray-500">Liquidity functionality coming soon</div>
-        </TabsContent>
+        </TabsContent> */}
       </Tabs>
 
       <TooltipProvider>

@@ -13,10 +13,14 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
+    "types": ["@solana/wallet-adapter-wallets"],
     "plugins": [
       {
         "name": "next"
-      }
+      },
+      
+         
+      
     ],
     "paths": {
       "@/*": ["./*"]

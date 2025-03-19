@@ -77,13 +77,13 @@ export default function FloatingSymbols() {
           initial={{
             x: item.x,
             y: item.y,
-            scale: 0.5,
-            opacity: 0,
+            scale: 4.5,
+            opacity: 10,
           }}
           animate={{
             x: [item.x, item.x + 100, item.x - 100, item.x],
             y: [item.y, item.y - 100, item.y + 100, item.y],
-            opacity: [0, 0.15, 0.1, 0],
+            opacity: [0.5, 1.5, 0.5, 1],
             scale: [0.5, 1, 0.8, 0.5],
           }}
           transition={{

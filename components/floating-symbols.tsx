@@ -69,7 +69,7 @@ export default function FloatingSymbols() {
   }, [])
 
   return (
-    <div className="fixed inset-0 pointer-events-none overflow-hidden">
+    <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
       {floatingSymbols.map((item) => (
         <motion.div
           key={item.id}

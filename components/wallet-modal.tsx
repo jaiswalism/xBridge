@@ -10,12 +10,12 @@ interface WalletModalProps {
 }
 
 export default function WalletModal({ isOpen, onClose }: WalletModalProps) {
-  const { connect, wallets } = useWallet()
+  const { connect } = useWallet()
 
   if (!isOpen) return null
 
-  const handleConnect = (walletId: string) => {
-    connect(walletId)
+  const handleConnect = () => {
+    connect()
     onClose()
   }
 
@@ -46,32 +46,18 @@ export default function WalletModal({ isOpen, onClose }: WalletModalProps) {
           </button>
         </div>
 
-        {/* Wallet Options */}
-        <div className="space-y-3 mb-6">
-          {wallets.map((wallet) => (
-            <motion.button
-              key={wallet.id}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => handleConnect(wallet.id)}
-              className="flex items-center w-full p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
-            >
-              <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mr-4">
-                <img 
-                  src={wallet.icon} 
-                  alt={wallet.name}
-                  className="w-6 h-6 object-contain"
-                />
-              </div>
-              <div className="text-left">
-                <span className="font-medium block">{wallet.name}</span>
-              </div>
-            </motion.button>
-          ))}
-        </div>
+        {/* Connect Button */}
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={handleConnect}
+          className="w-full p-4 bg-[#BE3144] text-white rounded-lg hover:bg-[#A52A2A] mb-6"
+        >
+          Connect Wallet
+        </motion.button>
 
         {/* Footer */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
           <div className="flex items-start">
             <AlertCircle className="w-5 h-5 text-yellow-500 mr-2 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-yellow-700">

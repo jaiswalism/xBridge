@@ -27,21 +27,16 @@ export default function SwapInterface() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="w-full max-w-md bg-white rounded-xl shadow-xl p-6"
+      className="w-full max-w-md bg-white rounded-xl shadow-xl p-6 z-10"
     >
       <div className="flex items-center mb-4">
-        <h2 className="text-2xl font-bold text-gray-800 flex-1">Swap & Bridge Together</h2>
+        <h2 className="text-2xl font-bold text-gray-800 flex-1">Swap & Bridge</h2>
         <Shield className="w-5 h-5 text-[#BE3144]" />
       </div>
 
       {isConnected && <div className="text-sm text-[#BE3144] mb-4">Balance: {balance} ETH</div>}
 
       <Tabs defaultValue="swap" className="mb-6">
-        <TabsList className="grid grid-cols-3 mb-4">
-          <TabsTrigger value="swap">Swap</TabsTrigger>
-          <TabsTrigger value="bridge">Bridge</TabsTrigger>
-          <TabsTrigger value="liquidity">Liquidity</TabsTrigger>
-        </TabsList>
 
         <TabsContent value="swap" className="space-y-4">
           <div className="bg-gray-50 p-4 rounded-lg">
@@ -181,11 +176,6 @@ export default function SwapInterface() {
           )}
         </Tooltip>
       </TooltipProvider>
-
-      <div className="mt-4 text-center text-xs text-gray-500 flex items-center justify-center">
-        <Shield className="w-3 h-3 mr-1" />
-        Audited by <span className="font-medium ml-1">CertiK</span>
-      </div>
     </motion.div>
   )
 }

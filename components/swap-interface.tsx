@@ -58,7 +58,7 @@ export default function SwapInterface() {
                   setToAmount((Number.parseFloat(e.target.value) * 1850).toString())
                 }}
                 placeholder="0.0"
-                className="w-full text-2xl bg-transparent outline-none"
+                className="w-full text-2xl bg-transparent outline-none text-black"
               />
               <TokenSelector selectedToken={fromToken} onSelectToken={setFromToken} isConnected={isConnected} />
             </div>
@@ -89,7 +89,7 @@ export default function SwapInterface() {
 
           <div className="bg-gray-50 p-4 rounded-lg">
             <div className="flex justify-between mb-2">
-              <span className="text-sm text-gray-500">To</span>
+              <span className="text-sm text-black">To</span>
               <div className="flex items-center">
                 <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"} mr-2`}></div>
                 <span className="text-sm text-gray-500">{isConnected ? "Connected" : "Disconnected"}</span>
@@ -106,7 +106,7 @@ export default function SwapInterface() {
                   setFromAmount((Number.parseFloat(e.target.value) / 1850).toString())
                 }}
                 placeholder="0.0"
-                className="w-full text-2xl bg-transparent outline-none"
+                className="w-full text-2xl bg-transparent outline-none text-black"
               />
               <TokenSelector selectedToken={toToken} onSelectToken={setToToken} isConnected={isConnected} />
             </div>
@@ -116,9 +116,9 @@ export default function SwapInterface() {
             <div className="flex justify-between items-center">
               <div className="flex items-center">
                 <Zap className="w-4 h-4 text-[#BE3144] mr-2" />
-                <span className="text-sm font-medium">Estimated Gas</span>
+                <span className="text-sm font-medium text-gray-500">Estimated Gas</span>
               </div>
-              <span className="text-sm">~$5.24</span>
+              <span className="text-sm text-gray-500">~$5.24</span>
             </div>
           </div>
 
@@ -126,7 +126,7 @@ export default function SwapInterface() {
             <div className="flex justify-between items-center">
               <div className="flex items-center">
                 <BarChart3 className="w-4 h-4 text-[#BE3144] mr-2" />
-                <span className="text-sm font-medium">Slippage Tolerance</span>
+                <span className="text-sm font-medium text-gray-500">Slippage Tolerance</span>
               </div>
               <div className="flex space-x-1">
                 {["0.5", "1.0", "2.0"].map((value) => (

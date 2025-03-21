@@ -1,3 +1,6 @@
 [submodule "xBridge/lib/forge-std"]
 	path = xBridge/lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
+[submodule "xBridge/lib/openzeppelin-contracts"]
+	path = xBridge/lib/openzeppelin-contracts
+	url = https://github.com/openzeppelin/openzeppelin-contracts

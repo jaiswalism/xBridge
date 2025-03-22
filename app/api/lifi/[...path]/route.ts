@@ -1,21 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// This special handler pattern works specifically with Next.js App Router
 export async function GET(
   request: NextRequest,
   { params }: { params: { path: string[] } }
 ) {
-  const { searchParams } = new URL(request.url);
-  
-  // Construct the target URL with all query parameters
-  const queryString = Array.from(searchParams.entries())
-    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-    .join('&');
-  
-  const targetUrl = `https://li.fi/v1/${params.path.join('/')}${
-    queryString ? '?' + queryString : ''
-  }`;
-  
   try {
+    // Get the pathname from the URL directly instead of using params
+    const url = new URL(request.url);
+    const pathname = url.pathname;
+    
+    // Extract the path segments by removing the /api/lifi part
+    const pathSegment = pathname.replace('/api/lifi/', '');
+    
+    const { searchParams } = url;
+    
+    // Construct the target URL with all query parameters
+    const queryString = Array.from(searchParams.entries())
+      .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+      .join('&');
+    
+    // Use li.quest domain
+    const targetUrl = `https://li.quest/v1/${pathSegment}${
+      queryString ? '?' + queryString : ''
+    }`;
+    
     console.log(`Proxying request to: ${targetUrl}`);
     
     // Forward the request to Li.Fi API
@@ -24,13 +33,27 @@ export async function GET(
       headers: {
         'Content-Type': 'application/json',
       },
-      next: { revalidate: 10 }, // Cache for 10 seconds
+      // Use no-store for tokens to avoid caching large responses
+      cache: pathSegment.startsWith('tokens') ? 'no-store' : 'default',
     });
     
     if (!response.ok) {
       console.error(`Error from Li.Fi API: ${response.status} ${response.statusText}`);
+      
+      // Try to get more detailed error information
+      let errorDetail = "";
+      try {
+        const errorResponse = await response.json();
+        errorDetail = errorResponse.message || JSON.stringify(errorResponse);
+      } catch (e) {
+        // If we can't parse the error response, just use the status text
+      }
+      
       return NextResponse.json(
-        { error: `Error from Li.Fi API: ${response.status} ${response.statusText}` },
+        { 
+          error: `Error from Li.Fi API: ${response.status} ${response.statusText}`,
+          detail: errorDetail 
+        },
         { status: response.status }
       );
     }
@@ -48,7 +71,10 @@ export async function GET(
     });
   } catch (error) {
     console.error('Proxy error:', error);
-    return NextResponse.json({ error: 'Failed to fetch from Li.Fi API' }, {
+    return NextResponse.json({ 
+      error: 'Failed to fetch from Li.Fi API',
+      detail: error instanceof Error ? error.message : String(error)
+    }, {
       status: 500,
     });
   }

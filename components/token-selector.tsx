@@ -18,9 +18,16 @@ interface TokenSelectorProps {
   onSelectToken: (token: any) => void;
   selectedChain: any;
   isConnected: boolean;
+  updateBalance?: (tokenAddress: string, balance: string) => void; // Add this prop
 }
 
-export default function TokenSelector({ selectedToken, onSelectToken, selectedChain, isConnected }: TokenSelectorProps) {
+export default function TokenSelector({
+  selectedToken,
+  onSelectToken,
+  selectedChain,
+  isConnected,
+  updateBalance // Function to update balance in wallet context
+}: TokenSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { address } = useAccount();
@@ -33,7 +40,7 @@ export default function TokenSelector({ selectedToken, onSelectToken, selectedCh
     async function fetchTokens() {
       if (!selectedChain?.id) return;
       try {
-        const response = await fetch(`https://li.quest/v1/tokens`);
+        const response = await fetch(`/api/lifi/tokens`);
         if (!response.ok) throw new Error("Failed to fetch tokens");
 
         const data = await response.json();
@@ -47,14 +54,14 @@ export default function TokenSelector({ selectedToken, onSelectToken, selectedCh
         setDisplayTokens(sortedTokens.slice(0, TOKENS_PER_BATCH));
 
         // Auto-select ETH or the first available token
-        if (sortedTokens.length > 0) onSelectToken(sortedTokens[0]);
+        if (sortedTokens.length > 0 && !selectedToken) onSelectToken(sortedTokens[0]);
       } catch (error) {
         console.error(`Error fetching tokens for ${selectedChain.name}:`, error);
         setTokens([]);
       }
     }
     fetchTokens();
-  }, [selectedChain]);
+  }, [selectedChain, onSelectToken, selectedToken]);
 
   const loadMoreTokens = useCallback(() => {
     if (loadedCount >= tokens.length) return;
@@ -108,6 +115,7 @@ export default function TokenSelector({ selectedToken, onSelectToken, selectedCh
                     selectedChain={selectedChain}
                     address={address}
                     isConnected={isConnected}
+                    updateBalance={updateBalance} // Pass down the updateBalance function
                     onSelect={() => {
                       onSelectToken(token);
                       setIsOpen(false);
@@ -126,7 +134,7 @@ export default function TokenSelector({ selectedToken, onSelectToken, selectedCh
   );
 }
 
-function TokenItem({ token, selectedChain, address, isConnected, onSelect }: any) {
+function TokenItem({ token, selectedChain, address, isConnected, updateBalance, onSelect }: any) {
   const cacheKey = `${selectedChain.id}-${token.address}`;
   const cachedBalance = balanceCache.get(cacheKey);
   const [balance, setBalance] = useState(cachedBalance ? cachedBalance.balance : "0.0000");
@@ -135,15 +143,27 @@ function TokenItem({ token, selectedChain, address, isConnected, onSelect }: any
     address,
     token: token.address !== "0x0000000000000000000000000000000000000000" ? token.address : undefined,
     chainId: selectedChain.id,
+    query: { enabled: isConnected && !!address }
   });
 
   useEffect(() => {
     if (balanceData?.formatted) {
-      const formattedBalance = parseFloat(balanceData.formatted).toFixed(4);
-      balanceCache.set(cacheKey, { balance: formattedBalance, timestamp: Date.now() });
+      // Format with 6 decimal places for consistency with SwapInterface
+      const formattedBalance = parseFloat(balanceData.formatted).toFixed(6);
+      
+      // Update local state
       setBalance(formattedBalance);
+      
+      // Update cache
+      balanceCache.set(cacheKey, { balance: formattedBalance, timestamp: Date.now() });
+      
+      // Send balance update to parent component if function exists
+      if (updateBalance) {
+        updateBalance(token.address, formattedBalance);
+        console.log(`Updating balance for ${token.symbol} (${token.address}): ${formattedBalance}`);
+      }
     }
-  }, [balanceData]);
+  }, [balanceData, token, cacheKey, updateBalance]);
 
   const balanceInUSD =
     token.priceUSD && balance

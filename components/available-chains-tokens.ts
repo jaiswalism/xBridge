@@ -11,7 +11,7 @@ export interface Chain {
   }
   
   export const chains: Chain[] = [
-    { id: "abstract", name: "Abstract", cmcId: "23456" },
+    // { id: "abstract", name: "Abstract", cmcId: "23456" },
     { id: "arbitrum", name: "Arbitrum", cmcId: "11841" },
     { id: "base", name: "Base", cmcId: "27716" },
     { id: "berchain", name: "Berchain", cmcId: "24647" },
@@ -21,9 +21,9 @@ export interface Chain {
     { id: "optimism", name: "Optimism", cmcId: "11840" },
     { id: "polygon", name: "Polygon", cmcId: "3890" },
     { id: "solana", name: "Solana", cmcId: "5426" },
-    { id: "soneium", name: "Soneium", cmcId: "45678" },
-    { id: "unichain", name: "Unichain", cmcId: "56789" },
-    { id: "zora", name: "Zora", cmcId: "67890" },
+    // { id: "soneium", name: "Soneium", cmcId: "45678" },
+    // { id: "unichain", name: "Unichain", cmcId: "56789" },
+    // { id: "zora", name: "Zora", cmcId: "67890" },
   ];
   
   export const tokens: Token[] = [
@@ -42,18 +42,18 @@ export interface Chain {
     { symbol: "TUSD", name: "TrueUSD", cmcId: "2563" },
     { symbol: "BASE", name: "Base", cmcId: "27716" },
     { symbol: "LINEA", name: "Linea", cmcId: "27657" },
-    { symbol: "ABS", name: "Abstract", cmcId: "23456" },
+    // { symbol: "ABS", name: "Abstract", cmcId: "23456" },
     { symbol: "BERA", name: "Berchain", cmcId: "24647" },
-    { symbol: "SON", name: "Soneium", cmcId: "45678" },
-    { symbol: "UNICHAIN", name: "Unichain", cmcId: "56789" },
-    { symbol: "ZORA", name: "Zora", cmcId: "67890" },
-    { symbol: "SQD", name: "Subsquid", cmcId: "78901" },
-    { symbol: "MYRC", name: "Blox MYRC", cmcId: "89012" },
+    // { symbol: "SON", name: "Soneium", cmcId: "45678" },
+    // { symbol: "UNICHAIN", name: "Unichain", cmcId: "56789" },
+    // { symbol: "ZORA", name: "Zora", cmcId: "67890" },
+    // { symbol: "SQD", name: "Subsquid", cmcId: "78901" },
+    // { symbol: "MYRC", name: "Blox MYRC", cmcId: "89012" },
   ];
   
   // Mapping of chains to their supported tokens
   export const chainToTokens: Record<string, string[]> = {
-    "abstract": ["ABT"],
+    // "abstract": ["ABT"],
     "arbitrum": ["ARB", "SQD", "MYRC"],
     "base": ["BASE"],
     "berchain": ["BER"],
@@ -63,8 +63,8 @@ export interface Chain {
     "optimism": ["OP", "LINK", "USDC", "USDT"],
     "polygon": ["MATIC", "USDC", "USDT"],
     "solana": ["SOL"],
-    "soneium": ["SON"],
-    "unichain": ["UNI"],
-    "zora": ["ZORA"]
+    // "soneium": ["SON"],
+    // "unichain": ["UNI"],
+    // "zora": ["ZORA"]
   };
   

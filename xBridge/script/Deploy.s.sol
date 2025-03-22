@@ -43,6 +43,9 @@ contract DeployScript is Script {
             registerArbitrumTokens(registry);
         }
         
+        // Setup token mappings across chains
+        setupTokenMappings(registry, uint256(block.chainid));
+        
         vm.stopBroadcast();
     }
     
@@ -149,4 +152,74 @@ contract DeployScript is Script {
             6,
             "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/arbitrum/assets/0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9/logo.png"
         );
+        
+        // DAI
+        registry.addToken(
+            0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1,
+            "Dai Stablecoin (Arb1)",
+            "DAI",
+            18,
+            "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/arbitrum/assets/0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1/logo.png"
+        );
     }
+    
+    function setupTokenMappings(TokenRegistry registry, uint256 chainId) internal {
+        if (chainId == 1) {
+            // Ethereum to Polygon mappings
+            registry.setChainTokenMapping(
+                137, // Polygon
+                0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, // USDC on Ethereum
+                0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174  // USDC on Polygon
+            );
+            
+            registry.setChainTokenMapping(
+                137, // Polygon
+                0xdAC17F958D2ee523a2206206994597C13D831ec7, // USDT on Ethereum
+                0xc2132D05D31c914a87C6611C10748AEb04B58e8F  // USDT on Polygon
+            );
+            
+            registry.setChainTokenMapping(
+                137, // Polygon
+                0x6B175474E89094C44Da98b954EedeAC495271d0F, // DAI on Ethereum
+                0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063  // DAI on Polygon
+            );
+            
+            // Ethereum to Arbitrum mappings
+            registry.setChainTokenMapping(
+                42161, // Arbitrum
+                0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, // USDC on Ethereum
+                0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8  // USDC on Arbitrum
+            );
+            
+            registry.setChainTokenMapping(
+                42161, // Arbitrum
+                0xdAC17F958D2ee523a2206206994597C13D831ec7, // USDT on Ethereum
+                0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9  // USDT on Arbitrum
+            );
+            
+            registry.setChainTokenMapping(
+                42161, // Arbitrum
+                0x6B175474E89094C44Da98b954EedeAC495271d0F, // DAI on Ethereum
+                0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1  // DAI on Arbitrum
+            );
+        } else if (chainId == 137) {
+            // Polygon to Ethereum mappings
+            registry.setChainTokenMapping(
+                1, // Ethereum
+                0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174, // USDC on Polygon
+                0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48  // USDC on Ethereum
+            );
+            
+            // Add more mappings as needed
+        } else if (chainId == 42161) {
+            // Arbitrum to Ethereum mappings
+            registry.setChainTokenMapping(
+                1, // Ethereum
+                0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8, // USDC on Arbitrum
+                0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48  // USDC on Ethereum
+            );
+            
+            // Add more mappings as needed
+        }
+    }
+}

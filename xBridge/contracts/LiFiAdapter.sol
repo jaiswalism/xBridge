@@ -1,11 +1,14 @@
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import "../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import "../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 import "./interfaces/IFeeCollector.sol";
+
+
 
 /**
  * @title LiFiAdapter
@@ -20,7 +23,7 @@ contract LiFiAdapter is Ownable, ReentrancyGuard {
     
     // Events
     event SwapInitiated(address indexed user, address indexed tokenIn, address indexed tokenOut, uint256 amountIn);
-    event BridgeInitiated(address indexed user, address indexed token, uint256 amount, uint256 destinationChainId);
+    event BridgeInitiated(address indexed user, address indexed token, address indexed recipient, uint256 amount, uint256 destinationChainId);
     event LiFiDiamondUpdated(address oldDiamond, address newDiamond);
     event FeeCollectorUpdated(address oldCollector, address newCollector);
     
@@ -82,12 +85,12 @@ contract LiFiAdapter is Ownable, ReentrancyGuard {
         
         // Collect fee
         if (fee > 0) {
-            IERC20(token).safeApprove(address(feeCollector), fee);
+            IERC20(token).safeIncreaseAllowance(address(feeCollector), fee);
             feeCollector.collectFee(token, fee);
         }
         
         // Approve LI.FI to spend tokens
-        IERC20(token).safeApprove(lifiDiamondAddress, amountAfterFee);
+        IERC20(token).safeIncreaseAllowance(lifiDiamondAddress, amountAfterFee);
         
         // Forward the call to LI.FI diamond
         (bool success, ) = lifiDiamondAddress.call(_callData);
@@ -122,19 +125,19 @@ contract LiFiAdapter is Ownable, ReentrancyGuard {
         
         // Collect fee
         if (fee > 0) {
-            IERC20(token).safeApprove(address(feeCollector), fee);
+            IERC20(token).safeIncreaseAllowance(address(feeCollector), fee);
             feeCollector.collectFee(token, fee);
         }
         
         // Approve LI.FI to spend tokens
-        IERC20(token).safeApprove(lifiDiamondAddress, amountAfterFee);
+        IERC20(token).safeIncreaseAllowance(lifiDiamondAddress, amountAfterFee);
         
         // Forward the call to LI.FI diamond
         (bool success, ) = lifiDiamondAddress.call(_callData);
         if (!success) revert BridgeFailed();
         
         // Emit event
-        emit BridgeInitiated(msg.sender, token, amount, destinationChainId);
+        emit BridgeInitiated(msg.sender, token, address(0), amount, destinationChainId);
     }
     
     /**

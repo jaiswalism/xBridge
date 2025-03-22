@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
-import "../contracts/FeeCollector.sol";
+import "../../lib/forge-std/src/Test.sol";
+import "../../contracts/FeeCollector.sol";
 import "./mocks/MockERC20.sol";
 
 contract FeeCollectorTest is Test {

@@ -1,52 +1,54 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-
 /**
  * @title MockERC20
- * @dev Mock ERC20 token for testing
+ * @dev Simple ERC20 token for testing
  */
-contract MockERC20 is ERC20, Ownable {
-    uint8 private _decimals;
+contract MockERC20 {
+    string public name;
+    string public symbol;
+    uint8 public decimals;
     
-    /**
-     * @dev Constructor
-     * @param name Token name
-     * @param symbol Token symbol
-     * @param decimals_ Token decimals
-     */
-    constructor(
-        string memory name,
-        string memory symbol,
-        uint8 decimals_
-    ) ERC20(name, symbol) Ownable(msg.sender) {
-        _decimals = decimals_;
+    uint256 public totalSupply;
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+    
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+    
+    constructor(string memory _name, string memory _symbol, uint8 _decimals) {
+        name = _name;
+        symbol = _symbol;
+        decimals = _decimals;
     }
     
-    /**
-     * @dev Override decimals function
-     */
-    function decimals() public view virtual override returns (uint8) {
-        return _decimals;
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+        totalSupply += amount;
+        emit Transfer(address(0), to, amount);
     }
     
-    /**
-     * @dev Mint tokens to an address
-     * @param to Recipient address
-     * @param amount Amount to mint
-     */
-    function mint(address to, uint256 amount) external onlyOwner {
-        _mint(to, amount);
+    function transfer(address to, uint256 amount) external returns (bool) {
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        emit Transfer(msg.sender, to, amount);
+        return true;
     }
     
-    /**
-     * @dev Burn tokens from an address
-     * @param from Address to burn from
-     * @param amount Amount to burn
-     */
-    function burn(address from, uint256 amount) external onlyOwner {
-        _burn(from, amount);
+    function approve(address spender, uint256 amount) external returns (bool) {
+        allowance[msg.sender][spender] = amount;
+        emit Approval(msg.sender, spender, amount);
+        return true;
+    }
+    
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+        if (from != msg.sender) {
+            allowance[from][msg.sender] -= amount;
+        }
+        balanceOf[from] -= amount;
+        balanceOf[to] += amount;
+        emit Transfer(from, to, amount);
+        return true;
     }
 }

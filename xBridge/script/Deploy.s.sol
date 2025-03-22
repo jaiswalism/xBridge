@@ -224,5 +224,3 @@ contract DeployScript is Script {
     }
 }
 
-    }}
-

@@ -7,10 +7,10 @@ import TokenSelector from "@/components/token-selector";
 import ChainSelector from "@/components/chain-selector";
 import { chains } from "@/shared/constants/chains";
 import debounce from "lodash.debounce";
-import { parseUnits } from "ethers";
+import { parseUnits, formatUnits } from "ethers";
 
 export default function SwapInterface() {
-  const { isConnected, balance, address } = useWallet();
+  const { isConnected, address, balances, updateTokenBalance } = useWallet();
   const [fromChain, setFromChain] = useState<any>(chains[0]);
   const [toChain, setToChain] = useState<any>(chains[1]);
   const [fromToken, setFromToken] = useState<any>(null);
@@ -22,6 +22,7 @@ export default function SwapInterface() {
   const [insufficientBalance, setInsufficientBalance] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [displayBalance, setDisplayBalance] = useState<string>("0.000000");
 
   useEffect(() => {
     if (!fromChain || !toChain) return;
@@ -47,6 +48,32 @@ export default function SwapInterface() {
     fetchTokens();
   }, [fromChain, toChain]);
 
+  // Update displayed balance whenever fromToken or balances change
+  useEffect(() => {
+    if (fromToken && balances) {
+      console.log("All balances:", balances);
+      console.log("From token address:", fromToken.address);
+      
+      // Get the balance for the selected token
+      const tokenBalance = balances[fromToken.address] || "0";
+      console.log("Raw token balance:", tokenBalance);
+      
+      try {
+        // Convert to number and format with 6 decimal places
+        const balanceNum = parseFloat(tokenBalance);
+        const formattedBalance = balanceNum.toFixed(6);
+        setDisplayBalance(formattedBalance);
+        
+        console.log("Formatted display balance:", formattedBalance);
+      } catch (error) {
+        console.error("Error formatting balance:", error);
+        setDisplayBalance("0.000000");
+      }
+    } else {
+      setDisplayBalance("0.000000");
+    }
+  }, [fromToken, balances]);
+
   // Debounced fetch function
   const fetchSwapDetails = useCallback(
     debounce(async () => {
@@ -70,35 +97,79 @@ export default function SwapInterface() {
         // Convert amount to Wei using the token's decimals
         const amountInWei = parseUnits(fromAmount, fromToken.decimals).toString();
 
+        // Log parameters for debugging
+        console.log("Quote request parameters:", {
+          fromChain: fromChain.id,
+          toChain: toChain.id,
+          fromToken: fromToken.address,
+          toToken: toToken.address,
+          fromAmount: amountInWei,
+          fromAddress: address
+        });
+
         const response = await fetch(
           `/api/lifi/quote?fromChain=${fromChain.id}&toChain=${toChain.id}&fromToken=${fromToken.address}&toToken=${toToken.address}&fromAmount=${amountInWei}&fromAddress=${address}`
         );
 
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to fetch quote");
+          let errorData;
+          try {
+            errorData = await response.json();
+            console.error("Quote API error response:", errorData);
+          } catch (e) {
+            console.error("Could not parse error response");
+          }
+          throw new Error(errorData?.error || errorData?.detail || `Failed to fetch quote: ${response.status} ${response.statusText}`);
         }
         
         const data = await response.json();
+        console.log("Quote response:", data);
 
         // Process the response data
-        setToAmount(data.estimate?.toAmount ? parseFloat(data.estimate.toAmount).toFixed(6) : "0.000000");
-        
-        // Calculate exchange rate if both amounts are available
-        if (data.estimate?.toAmount && fromAmount) {
-          const rate = parseFloat(data.estimate.toAmount) / parseFloat(fromAmount);
-          setExchangeRate(rate);
+        if (data.estimate) {
+          // Properly format the received amount using the token's decimals
+          const formattedToAmount = data.estimate.toAmount 
+            ? formatUnits(data.estimate.toAmount, toToken.decimals)
+            : "0";
+          setToAmount(parseFloat(formattedToAmount).toFixed(6));
+          
+          // Calculate exchange rate properly
+          if (data.estimate.toAmount && fromAmount) {
+            const fromAmountFloat = parseFloat(fromAmount);
+            const toAmountFloat = parseFloat(formattedToAmount);
+            const rate = toAmountFloat / fromAmountFloat;
+            setExchangeRate(rate);
+          } else {
+            setExchangeRate(null);
+          }
+          
+          // Extract fee information if available
+          setTransactionFee(data.estimate.feeCosts?.[0]?.amountUSD 
+            ? parseFloat(data.estimate.feeCosts[0].amountUSD) 
+            : null);
+        } else if (data.toAmount) {
+          // Fallback for older API response format
+          const formattedToAmount = formatUnits(data.toAmount, toToken.decimals);
+          setToAmount(parseFloat(formattedToAmount).toFixed(6));
+          
+          if (data.toAmount && fromAmount) {
+            const fromAmountFloat = parseFloat(fromAmount);
+            const toAmountFloat = parseFloat(formattedToAmount);
+            const rate = toAmountFloat / fromAmountFloat;
+            setExchangeRate(rate);
+          } else {
+            setExchangeRate(null);
+          }
+          
+          setTransactionFee(data.feeCosts?.[0]?.amountUSD 
+            ? parseFloat(data.feeCosts[0].amountUSD) 
+            : null);
         } else {
-          setExchangeRate(null);
+          throw new Error("Unexpected response format from quote API");
         }
-        
-        // Extract fee information if available
-        setTransactionFee(data.estimate?.feeCosts?.[0]?.amountUSD 
-          ? parseFloat(data.estimate.feeCosts[0].amountUSD) 
-          : null);
       } catch (error) {
         console.error("Error fetching swap details:", error);
-        setError("Failed to get swap quote. Please try again.");
+        setError(error instanceof Error ? error.message : "Failed to get swap quote. Please try again.");
         setToAmount("");
         setExchangeRate(null);
         setTransactionFee(null);
@@ -116,18 +187,40 @@ export default function SwapInterface() {
     if (error) setError(null);
   }, [fromAmount, fetchSwapDetails, error]);
 
-  // Validate balance
+  // Validate balance with proper comparison - FIXED IMPLEMENTATION
   useEffect(() => {
-    if (!fromToken || !balance || !fromAmount) {
+    if (!fromToken || !balances || !fromAmount) {
       setInsufficientBalance(false);
       return;
     }
 
-    const userBalance = parseFloat(balance[fromToken.address] || "0");
+    const tokenAddress = fromToken.address;
+    const tokenBalance = balances[tokenAddress] || "0";
+    
+    // Log values for debugging
+    console.log("Checking balance for:", fromToken.symbol);
+    console.log("Token balance string:", tokenBalance);
+    
+    // Convert balance and input to numbers for accurate comparison
+    const userBalance = parseFloat(tokenBalance);
     const inputAmount = parseFloat(fromAmount);
-
-    setInsufficientBalance(inputAmount > userBalance);
-  }, [fromAmount, fromToken, balance]);
+    
+    // Apply a tiny gas buffer for native tokens (ETH, BNB, etc.)
+    const isNativeToken = tokenAddress === "0x0000000000000000000000000000000000000000";
+    // Even smaller buffer - 0.00001 ETH (approximately $0.02)
+    const gasBuffer = isNativeToken ? 0.00001 : 0;
+    const effectiveBalance = Math.max(0, userBalance - gasBuffer);
+    
+    console.log({
+      userBalance,
+      inputAmount,
+      gasBuffer,
+      effectiveBalance,
+      isInsufficient: inputAmount > effectiveBalance
+    });
+    
+    setInsufficientBalance(inputAmount > effectiveBalance);
+  }, [fromAmount, fromToken, balances]);
 
   const handleSwap = () => {
     if (!isConnected || insufficientBalance || isLoading) return;
@@ -141,6 +234,13 @@ export default function SwapInterface() {
     if (value === "" || /^\d*\.?\d*$/.test(value)) {
       setFromAmount(value);
     }
+  };
+
+  // Helper function to format exchange rate display
+  const formatExchangeRate = (rate: number | null) => {
+    if (rate === null) return "";
+    if (rate > 1000000) return "≈ High conversion rate";
+    return rate.toFixed(6);
   };
 
   return (
@@ -161,9 +261,15 @@ export default function SwapInterface() {
             onSelectToken={setFromToken}
             selectedChain={fromChain}
             isConnected={isConnected}
+            updateBalance={updateTokenBalance} 
           />
         </div>
         {insufficientBalance && <p className="text-red-500 text-sm mt-1">Insufficient balance</p>}
+        {fromToken && (
+          <p className="text-sm text-gray-500">
+            Available: {displayBalance} {fromToken.symbol}
+          </p>
+        )}
       </div>
 
       {/* Swap Button */}
@@ -198,7 +304,8 @@ export default function SwapInterface() {
             selectedToken={toToken} 
             onSelectToken={setToToken} 
             selectedChain={toChain} 
-            isConnected={isConnected} 
+            isConnected={isConnected}
+            updateBalance={updateTokenBalance}
           />
         </div>
       </div>
@@ -219,7 +326,7 @@ export default function SwapInterface() {
         )}
         {exchangeRate && fromToken && toToken && (
           <p>
-            1 {fromToken?.symbol} ≈ {exchangeRate.toFixed(6)} {toToken?.symbol}
+            1 {fromToken?.symbol} ≈ {formatExchangeRate(exchangeRate)} {toToken?.symbol}
           </p>
         )}
         {transactionFee !== null && (

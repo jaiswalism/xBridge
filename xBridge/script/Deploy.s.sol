@@ -149,4 +149,4 @@ contract DeployScript is Script {
             6,
             "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/arbitrum/assets/0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9/logo.png"
         );
-    }
+    }}

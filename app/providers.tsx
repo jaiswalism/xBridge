@@ -26,16 +26,16 @@ const config = getDefaultConfig({
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClient}>
+      <WagmiProvider config={config}>
         <RainbowKitProvider>
-          <ThemeProvider attribute="class" defaultTheme="dark">
-            <WalletProvider>
+          <WalletProvider>
+            <ThemeProvider attribute="class" defaultTheme="light">
               {children}
-            </WalletProvider>
-          </ThemeProvider>
+            </ThemeProvider>
+          </WalletProvider>
         </RainbowKitProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
+      </WagmiProvider>
+    </QueryClientProvider>
   )
 }

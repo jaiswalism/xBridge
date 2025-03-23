@@ -1,82 +1,86 @@
-"use client"
+"use client";
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { useWallet as useSolanaWallet, useConnection } from '@solana/wallet-adapter-react'
-import { PublicKey } from '@solana/web3.js'
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { useAccount, useBalance, useDisconnect } from 'wagmi';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
+import { formatEther } from 'viem';
 
 interface WalletContextType {
-  isConnected: boolean
-  address: string
-  balance: string
-  connect: (walletName: string) => void
-  disconnect: () => void
-  wallets: Array<{ id: string, name: string, icon: string }>
+  isConnected: boolean;
+  address: string;
+  balance: string;
+  balances: Record<string, string>; // Add a mapping of token addresses to balances
+  connect: () => void;
+  disconnect: () => void;
+  updateTokenBalance: (tokenAddress: string, balance: string) => void; // Add function to update token balance
 }
 
 const WalletContext = createContext<WalletContextType>({
   isConnected: false,
   address: "",
   balance: "0",
+  balances: {},
   connect: () => {},
   disconnect: () => {},
-  wallets: []
-})
+  updateTokenBalance: () => {}
+});
 
-export const useWallet = () => useContext(WalletContext)
+export const useWallet = () => useContext(WalletContext);
 
-interface WalletProviderProps {
-  children: ReactNode
-}
-
-export function WalletProvider({ children }: WalletProviderProps) {
-  const { wallets: solanaWallets, select, connect: solanaConnect, disconnect: solanaDisconnect, publicKey, connected } = useSolanaWallet()
-  const { connection } = useConnection()
-  const [balance, setBalance] = useState("0")
-
-  // Fetch balance when connected
+export function WalletProvider({ children }: { children: ReactNode }) {
+  const { address, isConnected } = useAccount();
+  const { data: balanceData } = useBalance({
+    address: address,
+    query: { enabled: !!address }
+  });
+  const { disconnect } = useDisconnect();
+  const { openConnectModal } = useConnectModal();
+  
+  // Native token balance (ETH)
+  const balance = balanceData ? formatEther(balanceData.value).substring(0, 6) : "0";
+  
+  // Add a state to track all token balances
+  const [balances, setBalances] = useState<Record<string, string>>({});
+  
+  // Set the native token balance whenever it changes
   useEffect(() => {
-    const fetchBalance = async () => {
-      if (connected && publicKey) {
-        const balance = await connection.getBalance(publicKey)
-        setBalance((balance / 1e9).toFixed(4))
-      } else {
-        setBalance("0")
-      }
+    if (balanceData && address) {
+      // Format the balance with 6 decimal places
+      const formattedBalance = formatEther(balanceData.value);
+      
+      // Store native token balance with the zero address as key
+      setBalances(prev => ({
+        ...prev,
+        "0x0000000000000000000000000000000000000000": formattedBalance
+      }));
+      
+      console.log("Updated native token balance:", formattedBalance);
     }
-    fetchBalance()
-  }, [connected, publicKey, connection])
-
-  // Map Solana wallets to your UI structure
-  const wallets = solanaWallets.map(wallet => ({
-    id: wallet.adapter.name.toLowerCase(),
-    name: wallet.adapter.name,
-    icon: wallet.adapter.icon
-  }))
-
-  const connect = (walletName: string) => {
-    const wallet = solanaWallets.find(w => w.adapter.name.toLowerCase() === walletName)
-    if (wallet) {
-      select(wallet.adapter.name)
-      solanaConnect().catch(console.error)
-    }
-  }
-
-  const disconnect = () => {
-    solanaDisconnect().catch(console.error)
-  }
+  }, [balanceData, address]);
+  
+  // Function to update balance for a specific token
+  const updateTokenBalance = useCallback((tokenAddress: string, tokenBalance: string) => {
+    setBalances(prev => ({
+      ...prev,
+      [tokenAddress]: tokenBalance
+    }));
+    
+    console.log(`Updated balance for token ${tokenAddress}:`, tokenBalance);
+  }, []);
 
   return (
     <WalletContext.Provider
       value={{
-        isConnected: connected,
-        address: publicKey?.toBase58() || "",
-        balance,
-        connect,
+        isConnected,
+        address: address || "",
+        balance, // Keep the original balance property for backward compatibility
+        balances, // Add the new balances object
+        connect: openConnectModal || (() => {}),
         disconnect,
-        wallets
+        updateTokenBalance
       }}
     >
       {children}
     </WalletContext.Provider>
-  )
+  );
 }

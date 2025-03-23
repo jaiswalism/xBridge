@@ -1,41 +1,41 @@
-// app/providers.tsx
 "use client"
 
-import { ConnectionProvider, WalletProvider as SolanaWalletProvider } from '@solana/wallet-adapter-react'
-import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
-import {
-  PhantomWalletAdapter,
-  SolflareWalletAdapter,
-  
-} from '@solana/wallet-adapter-wallets'
-import { clusterApiUrl } from '@solana/web3.js'
 import { ThemeProvider } from "@/components/theme-provider"
 import { WalletProvider } from "@/hooks/use-wallet"
-import { useMemo } from 'react'
+import '@rainbow-me/rainbowkit/styles.css'
+import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { WagmiProvider, http } from 'wagmi'
+import { mainnet, polygon, optimism, arbitrum } from 'wagmi/chains'
+
+const queryClient = new QueryClient()
+
+const WALLET_CONNECT_PROJECT_ID = '2d2c2c6d98c3fb70090d1c59f804680c'
+
+const config = getDefaultConfig({
+  appName: 'xBridge',
+  projectId: WALLET_CONNECT_PROJECT_ID,
+  chains: [mainnet, polygon, optimism, arbitrum],
+  transports: {
+    [mainnet.id]: http(),
+    [polygon.id]: http(),
+    [optimism.id]: http(),
+    [arbitrum.id]: http(),
+  },
+})
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const endpoint = useMemo(() => clusterApiUrl('mainnet-beta'), [])
-  
-  const wallets = useMemo(
-    () => [
-      new PhantomWalletAdapter(),
-      new SolflareWalletAdapter(),
-      
-    ],
-    []
-  )
-
   return (
-    <ConnectionProvider endpoint={endpoint}>
-      <SolanaWalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>
-          <ThemeProvider attribute="class" defaultTheme="dark">
-            <WalletProvider>
+    <QueryClientProvider client={queryClient}>
+      <WagmiProvider config={config}>
+        <RainbowKitProvider>
+          <WalletProvider>
+            <ThemeProvider attribute="class" defaultTheme="light">
               {children}
-            </WalletProvider>
-          </ThemeProvider>
-        </WalletModalProvider>
-      </SolanaWalletProvider>
-    </ConnectionProvider>
+            </ThemeProvider>
+          </WalletProvider>
+        </RainbowKitProvider>
+      </WagmiProvider>
+    </QueryClientProvider>
   )
 }

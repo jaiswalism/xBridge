@@ -1,110 +1,196 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { ChevronDown, ExternalLink } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu"
-import { motion } from "framer-motion"
+import { useState, useEffect, useRef, useCallback } from "react";
+import { ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useAccount, useBalance } from "wagmi";
+import { chains } from "@/shared/constants/chains";
+import Image from "next/image";
 
-const tokens = [
-  { symbol: "ETH", name: "Ethereum", balance: "1.25", chainIcon: "🔵", price: "$3,450.20" },
-  { symbol: "USDC", name: "USD Coin", balance: "1250.00", chainIcon: "🟢", price: "$1.00" },
-  { symbol: "USDT", name: "Tether", balance: "500.00", chainIcon: "🟢", price: "$1.00" },
-  { symbol: "DAI", name: "Dai", balance: "750.00", chainIcon: "🟡", price: "$1.00" },
-  { symbol: "BTC", name: "Bitcoin", balance: "0.05", chainIcon: "🟠", price: "$65,750.30" },
-  { symbol: "MATIC", name: "Polygon", balance: "2500.00", chainIcon: "🟣", price: "$0.58" },
-  { symbol: "SOL", name: "Solana", balance: "35.00", chainIcon: "🟣", price: "$145.20" },
-  { symbol: "AVAX", name: "Avalanche", balance: "100.00", chainIcon: "🔴", price: "$35.75" },
-]
+const balanceCache = new Map();
+const CACHE_DURATION = 10 * 60 * 1000;
+const TOKENS_PER_BATCH = 10;
+
+const getTokenIcon = (token: any) => token.logoURI?.startsWith("http") ? token.logoURI : "";
 
 interface TokenSelectorProps {
-  selectedToken: string
-  onSelectToken: (token: string) => void
-  isConnected: boolean
+  selectedToken: any;
+  onSelectToken: (token: any) => void;
+  selectedChain: any;
+  isConnected: boolean;
+  updateBalance?: (tokenAddress: string, balance: string) => void; // Add this prop
 }
 
-export default function TokenSelector({ selectedToken, onSelectToken, isConnected }: TokenSelectorProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
+export default function TokenSelector({
+  selectedToken,
+  onSelectToken,
+  selectedChain,
+  isConnected,
+  updateBalance // Function to update balance in wallet context
+}: TokenSelectorProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const { address } = useAccount();
+  const [tokens, setTokens] = useState<any[]>([]);
+  const [displayTokens, setDisplayTokens] = useState<any[]>([]);
+  const [loadedCount, setLoadedCount] = useState(TOKENS_PER_BATCH);
+  const observerRef = useRef(null);
 
-  const selectedTokenData = tokens.find((t) => t.symbol === selectedToken)
+  useEffect(() => {
+    async function fetchTokens() {
+      if (!selectedChain?.id) return;
+      try {
+        const response = await fetch(`/api/lifi/tokens`);
+        if (!response.ok) throw new Error("Failed to fetch tokens");
 
-  const filteredTokens = tokens.filter(
-    (token) =>
-      token.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      token.name.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+        const data = await response.json();
+        const filteredTokens = data.tokens[selectedChain.id] || [];
+
+        // Ensure ETH is the first token in the list
+        const ethToken = filteredTokens.find((token: any) => token.symbol === "ETH") || filteredTokens[0];
+        const sortedTokens = [ethToken, ...filteredTokens.filter((t: any) => t.address !== ethToken.address)];
+
+        setTokens(sortedTokens);
+        setDisplayTokens(sortedTokens.slice(0, TOKENS_PER_BATCH));
+
+        // Auto-select ETH or the first available token
+        if (sortedTokens.length > 0 && !selectedToken) onSelectToken(sortedTokens[0]);
+      } catch (error) {
+        console.error(`Error fetching tokens for ${selectedChain.name}:`, error);
+        setTokens([]);
+      }
+    }
+    fetchTokens();
+  }, [selectedChain, onSelectToken, selectedToken]);
+
+  const loadMoreTokens = useCallback(() => {
+    if (loadedCount >= tokens.length) return;
+    const newCount = Math.min(loadedCount + TOKENS_PER_BATCH, tokens.length);
+    setDisplayTokens(tokens.slice(0, newCount));
+    setLoadedCount(newCount);
+  }, [loadedCount, tokens]);
+
+  useEffect(() => {
+    if (!observerRef.current || loadedCount >= tokens.length) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) loadMoreTokens();
+    });
+    observer.observe(observerRef.current);
+    return () => observer.disconnect();
+  }, [loadMoreTokens]);
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuTrigger asChild>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="flex items-center bg-gray-200 px-3 py-1 rounded-full"
-        >
-          <div className="w-6 h-6 rounded-full bg-[#BE3144]/20 flex items-center justify-center mr-2">
-            <span>{selectedTokenData?.chainIcon || "🔵"}</span>
-          </div>
-          <span>{selectedToken}</span>
-          <ChevronDown className="w-4 h-4 ml-1" />
-        </motion.button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-72 p-2">
-        <div className="mb-2">
+    <div className="relative z-40">
+      <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+        <DropdownMenuTrigger asChild>
+          <button className="flex items-center space-x-1 bg-gray-100 px-3 py-2 rounded-lg">
+            {selectedToken?.logoURI?.startsWith("http") ? (
+              <Image src={selectedToken.logoURI} alt={selectedToken?.symbol || "Token"} width={24} height={24} />
+            ) : (
+              <div className="w-6 h-6 bg-gray-300 rounded-full" />
+            )}
+            <span className="font-medium">{selectedToken?.symbol || "Select Token"}</span>
+            <ChevronDown size={16} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-[240px] p-2 z-50">
           <input
             type="text"
-            placeholder="Search tokens..."
+            placeholder="Search tokens"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full p-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#BE3144]/50"
+            className="w-full p-2 text-sm border rounded-md focus:ring-2 focus:ring-red-500 mb-2"
           />
-        </div>
-
-        <div className="max-h-60 overflow-y-auto">
-          {filteredTokens.length > 0 ? (
-            filteredTokens.map((token) => (
-              <DropdownMenuItem
-                key={token.symbol}
-                onClick={() => {
-                  onSelectToken(token.symbol)
-                  setIsOpen(false)
-                  setSearchQuery("")
-                }}
-                className="flex justify-between items-center py-2 cursor-pointer"
-              >
-                <div className="flex items-center">
-                  <div className="w-8 h-8 rounded-full bg-[#BE3144]/10 flex items-center justify-center mr-2">
-                    <span>{token.chainIcon}</span>
-                  </div>
-                  <div>
-                    <div className="font-medium">{token.symbol}</div>
-                    <div className="text-xs text-gray-500">{token.name}</div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  {isConnected && <div className="text-sm font-medium">{token.balance}</div>}
-                  <div className="text-xs text-gray-500">{token.price}</div>
-                </div>
-              </DropdownMenuItem>
-            ))
-          ) : (
-            <div className="py-2 text-center text-sm text-gray-500">No tokens found</div>
-          )}
-        </div>
-
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="flex items-center justify-center text-[#BE3144] cursor-pointer">
-          <ExternalLink className="w-4 h-4 mr-2" />
-          <span>View all tokens</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
+          <div className="max-h-[300px] overflow-y-auto">
+            {displayTokens.length > 0 ? (
+              displayTokens
+                .filter((token) =>
+                  token.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  token.name.toLowerCase().includes(searchQuery.toLowerCase())
+                )
+                .map((token) => (
+                  <TokenItem
+                    key={token.address}
+                    token={token}
+                    selectedChain={selectedChain}
+                    address={address}
+                    isConnected={isConnected}
+                    updateBalance={updateBalance} // Pass down the updateBalance function
+                    onSelect={() => {
+                      onSelectToken(token);
+                      setIsOpen(false);
+                      setSearchQuery("");
+                    }}
+                  />
+                ))
+            ) : (
+              <p className="text-gray-500 text-center">No tokens available</p>
+            )}
+            <div ref={observerRef} className="h-10 w-full"></div>
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
 }
 
+function TokenItem({ token, selectedChain, address, isConnected, updateBalance, onSelect }: any) {
+  const cacheKey = `${selectedChain.id}-${token.address}`;
+  const cachedBalance = balanceCache.get(cacheKey);
+  const [balance, setBalance] = useState(cachedBalance ? cachedBalance.balance : "0.0000");
+
+  const { data: balanceData } = useBalance({
+    address,
+    token: token.address !== "0x0000000000000000000000000000000000000000" ? token.address : undefined,
+    chainId: selectedChain.id,
+    query: { enabled: isConnected && !!address }
+  });
+
+  useEffect(() => {
+    if (balanceData?.formatted) {
+      // Format with 6 decimal places for consistency with SwapInterface
+      const formattedBalance = parseFloat(balanceData.formatted).toFixed(6);
+      
+      // Update local state
+      setBalance(formattedBalance);
+      
+      // Update cache
+      balanceCache.set(cacheKey, { balance: formattedBalance, timestamp: Date.now() });
+      
+      // Send balance update to parent component if function exists
+      if (updateBalance) {
+        updateBalance(token.address, formattedBalance);
+        console.log(`Updating balance for ${token.symbol} (${token.address}): ${formattedBalance}`);
+      }
+    }
+  }, [balanceData, token, cacheKey, updateBalance]);
+
+  const balanceInUSD =
+    token.priceUSD && balance
+      ? (Number(balance) * Number(token.priceUSD)).toFixed(4)
+      : "0.0000";
+
+  return (
+    <div className="flex justify-between items-center p-2 hover:bg-gray-100 rounded cursor-pointer" onClick={onSelect}>
+      <div className="flex items-center space-x-2">
+        {token.logoURI?.startsWith("http") ? (
+          <Image src={token.logoURI} alt={token.symbol} width={24} height={24} />
+        ) : (
+          <div className="w-6 h-6 bg-gray-300 rounded-full" />
+        )}
+        <div>
+          <div className="font-medium">{token.symbol}</div>
+          <div className="text-xs text-gray-500">{token.name}</div>
+        </div>
+      </div>
+      <div className="text-right">
+        <div className="text-sm">${Number(token.priceUSD).toFixed(4) || "0.0000"}</div>
+        {isConnected && (
+          <div className="text-xs text-gray-500">
+            {balance} {token.symbol} (${balanceInUSD})
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -49,7 +49,7 @@ export default function FloatingSymbols() {
           id: i,
           x: Math.random() * windowWidth,
           y: Math.random() * windowHeight,
-          size: Math.random() * 20 + 20, // 20-40px
+          size: Math.random() * 45 + 20, // 20-40px
           duration: Math.random() * 100 + 100, // 100-200s
           delay: Math.random() * 2,
           symbol: randomSymbol.symbol,
@@ -69,7 +69,7 @@ export default function FloatingSymbols() {
   }, [])
 
   return (
-    <div className="fixed inset-0 pointer-events-none overflow-hidden">
+    <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
       {floatingSymbols.map((item) => (
         <motion.div
           key={item.id}

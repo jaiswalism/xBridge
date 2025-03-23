@@ -18,7 +18,7 @@ export default function SwapPage() {
   }, [])
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-[#BE3144] transition-colors duration-500 relative overflow-hidden">
+    <main className="flex h-screen flex-col items-center justify-center p-4 bg-gradient-to-b from-[#09122C] to-black transition-colors duration-500 relative overflow-hidden">
       <FloatingSymbols />
       <SwapInterface />
       <WelcomeModal isOpen={showWelcomeModal} onClose={() => setShowWelcomeModal(false)} />

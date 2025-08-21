@@ -7,7 +7,27 @@ import TokenSelector from "@/components/token-selector";
 import ChainSelector from "@/components/chain-selector";
 import { chains } from "@/shared/constants/chains";
 import debounce from "lodash.debounce";
-import { parseUnits, formatUnits } from "ethers";
+import { parseUnits, formatUnits, BrowserProvider, Contract } from "ethers";
+
+// Define transaction data interface
+interface TransactionData {
+  to: string;
+  data: string;
+  value?: string;
+  gasLimit?: string;
+}
+
+// Define swap transaction response interface
+interface SwapTransactionResponse {
+  txData: TransactionData;
+  route?: any;
+  fee?: {
+    percentage: number;
+    percentageFormatted: number;
+    amount: string;
+    token: string;
+  };
+}
 
 export default function SwapInterface() {
   const { isConnected, address, balances, updateTokenBalance } = useWallet();
@@ -23,6 +43,10 @@ export default function SwapInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [displayBalance, setDisplayBalance] = useState<string>("0.000000");
+  
+  // Transaction state
+  const [txHash, setTxHash] = useState<string | null>(null);
+  const [txStatus, setTxStatus] = useState<'pending' | 'confirmed' | 'failed' | null>(null);
 
   useEffect(() => {
     if (!fromChain || !toChain) return;
@@ -107,9 +131,17 @@ export default function SwapInterface() {
           fromAddress: address
         });
 
-        const response = await fetch(
-          `/api/lifi/quote?fromChain=${fromChain.id}&toChain=${toChain.id}&fromToken=${fromToken.address}&toToken=${toToken.address}&fromAmount=${amountInWei}&fromAddress=${address}`
-        );
+        // Build query with all required parameters
+        const queryParams = new URLSearchParams({
+          fromChain: fromChain.id.toString(),
+          toChain: toChain.id.toString(),
+          fromToken: fromToken.address,
+          toToken: toToken.address,
+          fromAmount: amountInWei,
+          fromAddress: address
+        });
+        
+        const response = await fetch(`/api/lifi/quote?${queryParams.toString()}`);
 
         if (!response.ok) {
           let errorData;
@@ -222,11 +254,147 @@ export default function SwapInterface() {
     setInsufficientBalance(inputAmount > effectiveBalance);
   }, [fromAmount, fromToken, balances]);
 
-  const handleSwap = () => {
-    if (!isConnected || insufficientBalance || isLoading) return;
-    // Implement the actual swap functionality here
-    console.log("Swapping", fromAmount, fromToken?.symbol, "from", fromChain.name, "to", toChain.name);
-  };
+// Updated handleSwap function following Li.Fi documentation
+const handleSwap = async () => {
+  if (!isConnected || insufficientBalance || isLoading || !fromToken || !toToken || !fromAmount) return;
+  
+  try {
+    // Reset states
+    setIsLoading(true);
+    setError(null);
+    setTxHash(null);
+    setTxStatus(null);
+    
+    // Convert amount to Wei using the token's decimals
+    const amountInWei = parseUnits(fromAmount, fromToken.decimals).toString();
+    
+    // Following the Li.Fi documentation for getting a quote
+    const queryParams = new URLSearchParams({
+      fromChain: fromChain.id.toString(),
+      toChain: toChain.id.toString(),
+      fromToken: fromToken.address,
+      toToken: toToken.address,
+      fromAmount: amountInWei,
+      fromAddress: address,
+      slippage: "1"
+    });
+    
+    console.log(`Getting quote with params: ${queryParams.toString()}`);
+    
+    // Step 1: Get a quote from Li.Fi
+    const quoteResponse = await fetch(`/api/lifi/quote?${queryParams.toString()}`);
+    
+    if (!quoteResponse.ok) {
+      let errorData;
+      try {
+        errorData = await quoteResponse.json();
+        console.error("Quote API error response:", errorData);
+      } catch (e) {
+        console.error("Could not parse error response");
+      }
+      throw new Error(errorData?.detail || errorData?.error || `Failed to fetch quote: ${quoteResponse.status} ${quoteResponse.statusText}`);
+    }
+    
+    const quoteData = await quoteResponse.json();
+    console.log("Quote response:", quoteData);
+    
+    // Check if we have transaction data
+    if (!quoteData.transactionRequest) {
+      throw new Error("Transaction data not available in the response. Please try again.");
+    }
+    
+    // Get the provider and signer
+    const provider = new BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    
+    // Handle token approvals for ERC20 tokens if needed
+    if (fromToken.address !== "0x0000000000000000000000000000000000000000" && quoteData.estimate?.approvalAddress) {
+      const erc20ABI = [
+        "function approve(address spender, uint256 amount) public returns (bool)",
+        "function allowance(address owner, address spender) public view returns (uint256)"
+      ];
+      
+      const spenderAddress = quoteData.estimate.approvalAddress;
+      
+      const tokenContract = new Contract(fromToken.address, erc20ABI, signer);
+      
+      // Check current allowance
+      const currentAllowance = await tokenContract.allowance(address, spenderAddress);
+      
+      if (BigInt(currentAllowance.toString()) < BigInt(amountInWei)) {
+        console.log(`Approving ${fromToken.symbol} spend to ${spenderAddress}...`);
+        const approvalTx = await tokenContract.approve(spenderAddress, amountInWei);
+        console.log("Approval transaction sent:", approvalTx.hash);
+        await approvalTx.wait();
+        console.log("Token approved for spending");
+      }
+    }
+    
+    // Execute the transaction
+    console.log("Executing transaction with data:", quoteData.transactionRequest);
+    const tx = await signer.sendTransaction({
+      to: quoteData.transactionRequest.to,
+      data: quoteData.transactionRequest.data,
+      value: quoteData.transactionRequest.value || "0",
+      gasLimit: BigInt(quoteData.transactionRequest.gasLimit || "3000000")
+    });
+    
+    // Update transaction state
+    setTxHash(tx.hash);
+    setTxStatus("pending");
+    console.log("Transaction submitted:", tx.hash);
+    
+    // For cross-chain transactions, we need to track the status using Li.Fi's status endpoint
+    // Start tracking the transaction
+    const trackTransaction = async (hash: string) => {
+      try {
+        const statusParams = new URLSearchParams({
+          txHash: hash,
+          chainId: fromChain.id.toString()
+        });
+        
+        const statusResponse = await fetch(`/api/lifi/status?${statusParams.toString()}`);
+        
+        if (!statusResponse.ok) {
+          console.error("Failed to get transaction status");
+          return;
+        }
+        
+        const statusData = await statusResponse.json();
+        console.log("Transaction status:", statusData);
+        
+        // Check if the transaction is complete
+        if (statusData.status === "DONE" || statusData.status === "CONFIRMED") {
+          setTxStatus("confirmed");
+          // Refresh balances
+          updateTokenBalance(fromToken.address, "0");
+          // For cross-chain swaps, the receiving transaction happens on the destination chain
+          if (fromChain.id === toChain.id) {
+            updateTokenBalance(toToken.address, "0");
+          }
+        } else if (statusData.status === "FAILED") {
+          setTxStatus("failed");
+          setError("Transaction failed on the blockchain. Please check your wallet for details.");
+        } else {
+          // Still pending, continue tracking
+          setTimeout(() => trackTransaction(hash), 5000); // Check every 5 seconds
+        }
+      } catch (error) {
+        console.error("Error tracking transaction:", error);
+      }
+    };
+    
+    // Start tracking the transaction
+    trackTransaction(tx.hash);
+    
+  } catch (error) {
+    console.error("Swap failed:", error);
+    setError(error instanceof Error ? error.message : "Transaction failed. Please try again.");
+    setTxStatus("failed");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Only allow numbers and a single decimal point
@@ -317,6 +485,31 @@ export default function SwapInterface() {
         </div>
       )}
 
+      {/* Transaction Status */}
+      {txHash && (
+        <div className={`text-sm mb-4 p-2 rounded ${
+          txStatus === 'confirmed' ? 'bg-green-50 text-green-600' : 
+          txStatus === 'failed' ? 'bg-red-50 text-red-500' : 
+          'bg-yellow-50 text-yellow-600'
+        }`}>
+          <p className="font-medium mb-1">
+            {txStatus === 'confirmed' ? '✅ Transaction confirmed' : 
+             txStatus === 'failed' ? '❌ Transaction failed' : 
+             '⏳ Transaction pending'}
+          </p>
+          <p className="break-all">
+            Hash: <a 
+              href={`${fromChain.blockExplorerUrls?.[0]}tx/${txHash}`} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="underline hover:text-blue-600"
+            >
+              {txHash}
+            </a>
+          </p>
+        </div>
+      )}
+
       {/* Live Calculation Details */}
       <div className="text-sm text-gray-500 mb-4">
         {fromAmount && fromToken && (
@@ -340,13 +533,18 @@ export default function SwapInterface() {
       <button
         onClick={handleSwap}
         className={`w-full py-3 rounded-lg font-medium transition-colors ${
-          !isConnected || insufficientBalance || isLoading
+          !isConnected || insufficientBalance || isLoading || !fromToken || !toToken || !fromAmount || txStatus === 'pending'
             ? "bg-gray-400 cursor-not-allowed"
             : "bg-[#BE3144] text-white hover:bg-[#c33e50]"
         }`}
-        disabled={!isConnected || insufficientBalance || isLoading}
+        disabled={!isConnected || insufficientBalance || isLoading || !fromToken || !toToken || !fromAmount || txStatus === 'pending'}
       >
-        {isLoading ? "Loading..." : insufficientBalance ? "Insufficient Balance" : "Swap"}
+        {isLoading ? "Loading..." : 
+         txStatus === 'pending' ? "Transaction Processing..." :
+         insufficientBalance ? "Insufficient Balance" : 
+         !fromToken || !toToken ? "Select Tokens" :
+         !fromAmount ? "Enter Amount" :
+         "Swap"}
       </button>
     </div>
   );
